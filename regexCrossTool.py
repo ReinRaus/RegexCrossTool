@@ -12,39 +12,38 @@ reCharsC = re.compile( reChars, re.I )
 # variants  все возможные варианты                      [ab]ccc , [ab]ccd
 class singleRegex:
     def __init__( self, regex, length ):
-        self.regex = regex   # исходное регулярное выражение
-        self.length = length # длина на которую оно действует
+        self.regex = regex   
+        self.length = length 
         self.__processEntitys()
         
     def __processEntitys( self ):
         def repl( m ):
             return "(?:"+re.escape( m.group(0) )+")"
-        res = reCharsC.findall( self.regex )
-        self.regex2 = reCharsC.sub( repl, self.regex )
+        res = reCharsC.findall( self.regex ) # все симв.классы
+        self.regex2 = reCharsC.sub( repl, self.regex ) # "атомизация" симв.классов
         self.regex2 = re.compile( "^" + self.regex2 + "$", re.I )
-        self.units = list( set( res ) )
-        self.variants = self.__getVariants()
+        self.units = list( set( res ) ) # только уникальные симв.классы
+        self.variants = self.__getVariants() # генерация вариантов
 
     def __getVariants( self ):
-        optim = self.__optimization()
-        print( optim, self.regex )
+        optim = self.__optimization() # пробуем применить оптимизации
         if optim: return optim
         result = []
         maxv = len( self.units )
         if maxv == 1: # если всего один символьный класс
             result.append( self.units[0]*self.length )
         else:
-            counter = [0]*(self.length+1)
-            label = 0
+            counter = [0]*(self.length+1)   # алогритм полного перебора массива
+            label = 0                       # длиной length от 0 до maxv
             iterCounter = 1
             while counter[self.length] == 0:
                 text = ""
-                for i in range( self.length ):
+                for i in range( self.length ): # соединяем симв.классы в одну строку на основе массива в котором идет полный перебор
                     text+= self.units[ counter[i] ]
-                if self.regex2.match( text ):
+                if self.regex2.match( text ): # проверям, что полученная строка соответствует "атомизированному" регулярному выражению, таким образом достигается поддержка регулярных варажений любой сложности
                     result.append( text )
 
-                counter[label]+= 1
+                counter[label]+= 1 # перебор +1, если достигли maxv, то увеличиваем элемент справа
                 while counter[label] == maxv:
                     label+=1
                     counter[label]+= 1
@@ -52,7 +51,7 @@ class singleRegex:
                     label-=1
                     counter[label] = 0
                 if iterCounter % 10000000 == 0:
-                    print( iterCounter )
+                    print( "I work. Iteration:", iterCounter )
                 iterCounter+=1
         return result
     
