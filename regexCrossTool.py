@@ -74,15 +74,18 @@ class singleRegex:
                     for j in parts:
                         result.append( i + j )
         # несколько символов подряд (в строке нет скобок)
-    ##    result2 = []
-    ##    if not re.search( r"[()]", self.regex ):
-    ##        grp = re.findall( r"(?<![\[])[a-z]{2,}(?![\]*+?{])", self.regex, re.I )
-    ##        if len( grp ) >0 :
-    ##            ent2 = getEntitys( self.regex.replace( grp[0], "#", 1 ) )
-    ##            ent2[0].replace( "#", "(?:"+grp[0]+")" )
-    ##            ent2[1] = re.compile( "^"+ent2[0]+"$", re.I )
-    ##            ent2[2].append( grp[0] )
-    ##            print( ent, "\n", ent2 )
+        result2 = []
+        if not re.search( r"[()]", self.regex ):
+            grp = re.findall( r"(?<![\[])[a-z]{2,}(?![\]*+?{])", self.regex, re.I )
+            if len( grp ) >0 :
+                counter = 1
+                while "["+"a"*counter+"]" in self.units:
+                    counter+= 1
+                opt = grp[0]
+                repl = "["+"a"*counter+"]"
+                regex = re.sub( r"(?<![\[])[a-z]{2,}(?![\]*+?{])", repl, self.regex, 1, re.I )
+                variants = singleRegex( regex, self.length-len(opt)+1 ).variants
+                result = [ i.replace( repl, opt ) for i in variants ]
         if len( result ) > 0: return result
         return None
 
@@ -90,5 +93,5 @@ class Tool:
 
     pass
 
-x = singleRegex( r".*(as|sd|df)(IN|SE|HI)", 6 ).variants
+x = singleRegex( r"[^C]*[^R]*III.*", 13 ).variants
 print( x )
