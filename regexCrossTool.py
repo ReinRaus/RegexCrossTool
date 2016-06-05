@@ -74,27 +74,42 @@ class singleRegex:
                     for j in parts:
                         result.append( i + j )
                 return result
-        # несколько символов подряд (вне символьного класса) где нет скобок
-        regex1 = r"\[(?:\.|[^]])*\]|([^[]*?)([a-z]{2,})(?!\s*[?*+{])" # что-то внутри [] или [a-z]{2,} если справа не квантификатор
+            
+        # оптимизация альтернативы с квантификатором и в регулярке больше ничего
+        # использует переменные предыдущей оптимизация, ничего между ними в
+        # коде не размещать
+
+        def recur( arr, string, length ):
+            res = []
+            for i in arr:
+                newstr = string + i
+                lenChars = len( reCharsC.findall( newstr ) )
+                if lenChars == length: res.append( newstr )
+                elif lenChars > length: pass
+                else:
+                    recres = recur( arr, newstr, length )
+                    for j in recres: res.append( j )
+            return res
+        re1 = r"^\(((?:"+reCh+r"\|)+"+reCh+r")\)[*+]$"
+        opt1 = re.findall(re1, self.regex, re.I)
+        if len( opt1 ) > 0:
+            opt1 = opt1[0]
+            parts = opt1.split( "|" )
+            if len( parts ) > 0: return recur( parts, "", self.length )
+        # несколько символов подряд (вне символьного класса) где нет скобок до вхождения
+        regex1 = r"^((?:\[(?:\.|[^]])*\]|[^([])*?)([a-z]{2,})(?!\s*[?*+{])" # что-то внутри [] или [a-z]{2,} если справа не квантификатор 
         grp = re.findall( regex1, self.regex, flags=re.I )
-        grp = list( filter( lambda x: re.search( r"^\w+$", x[1] ), grp ) )
-        if len( grp ) > 0 and re.search( "[()]", self.regex ) == None :
+        if len( grp ) > 0:
             counter = 1
             while "["+"a"*counter+"]" in self.units:
                 counter+= 1
             opt = grp[0][1]
             replText = "["+"a"*counter+"]"
-            counter = 0
             def repl( m ):
-                nonlocal counter
-                if counter == 0 and m.group(2):
-                    counter += 1
                     return m.group(1) + replText
-                else:
-                    return m.group()
             regex = re.sub( regex1, repl, self.regex, flags=re.I )
+            #print( "NewRegex", regex, self.regex )
             variants = singleRegex( regex, self.length-len(opt)+1 ).variants
-            #opt = "(?:" + ")(?:".join( opt ) + ")" # атомизируем то, что обрабатывалось одним целым
             result = [ i.replace( replText, opt ) for i in variants ]
         if len( result ) > 0: return result
         return None
