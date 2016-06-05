@@ -1,3 +1,7 @@
+import hexaMap
+maps = hexaMap.getMap( 7 )
+printer = hexaMap.getPrinter( 7 )
+
 regexs = [
     r".*H.*H.*",            # 0
     r"(DI|NS|TH|OM)*",      # 1 

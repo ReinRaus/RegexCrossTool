@@ -73,11 +73,12 @@ class singleRegex:
                 for i in result1:
                     for j in parts:
                         result.append( i + j )
-        # несколько символов подряд (вне символьного класса)
+                return result
+        # несколько символов подряд (вне символьного класса) где нет скобок
         regex1 = r"\[(?:\.|[^]])*\]|([^[]*?)([a-z]{2,})(?!\s*[?*+{])" # что-то внутри [] или [a-z]{2,} если справа не квантификатор
         grp = re.findall( regex1, self.regex, flags=re.I )
-        grp = list( filter( lambda x: re.search( r"^\w+$", x[1] ), grp ) ) 
-        if len( grp ) > 0:
+        grp = list( filter( lambda x: re.search( r"^\w+$", x[1] ), grp ) )
+        if len( grp ) > 0 and re.search( "[()]", self.regex ) == None :
             counter = 1
             while "["+"a"*counter+"]" in self.units:
                 counter+= 1
@@ -93,6 +94,7 @@ class singleRegex:
                     return m.group()
             regex = re.sub( regex1, repl, self.regex, flags=re.I )
             variants = singleRegex( regex, self.length-len(opt)+1 ).variants
+            #opt = "(?:" + ")(?:".join( opt ) + ")" # атомизируем то, что обрабатывалось одним целым
             result = [ i.replace( replText, opt ) for i in variants ]
         if len( result ) > 0: return result
         return None
@@ -101,6 +103,30 @@ class Tool:
     def __init__( self, cross ):
         tStart = time.time()
         self.cross = cross
+        self.reBack = [ i for i in range( len(cross.regexs) ) if re.search("\\\\\\d", cross.regexs[i] ) ]
+        self.loadOrCalcVariants()
+        self.fullABC = self.getFullABC()
+        changed = True
+        countUn, count = 0, 0
+        while changed or countUn < 5:
+            union = self.unionDiaps()
+            intersect = self.intersectMapping( union )
+            changed = self.filterDiaps( intersect )
+            if countUn  == 2:
+                self.checkReBack( intersect )
+            if not changed:
+                countUn+=1
+            else:
+                countUn = 0
+            count+= 1
+            print( "Algoritm step:", count )
+        def printer():
+            self.cross.printer( self.cross.maps, intersect )
+        self.print = printer
+        print( "Total time:", time.time() - tStart, "sec" )
+
+    def loadOrCalcVariants( self ):
+        cross = self.cross
         hash1 = hashlib.md5( "\n".join( cross.regexs + list( map( str, cross.allLen ) ) ).encode() ).hexdigest()
         fname = "cross-"+hash1+".cache"
         if os.path.isfile( fname ):
@@ -108,6 +134,7 @@ class Tool:
                 self.allRegexs = pickle.load( rfile )
                 print( "Cache from:", fname, "loaded." )
         else:
+            tStart = time.time()
             self.allRegexs = []
             for i in range( len( cross.regexs ) ):
                 t1 = time.time()
@@ -116,3 +143,134 @@ class Tool:
             with open( fname, "wb" ) as rfile:
                 pickle.dump( self.allRegexs, rfile )
             print( "Total time:", time.time()-tStart, "sec" )
+
+    def getFullABC( self ):
+        result = set()
+        for i in self.cross.regexs:
+            for j in reCharsC.findall( i ):
+                if not re.match( r"\[\^", j ) and not j == ".":
+                    result = result.union( self.char2set( j ) )
+        return result
+
+    def char2set( self, char ):
+        char=char.lower()
+        result = None
+        def convDiap( diap ):
+            return re.sub( r"([a-z])\-([a-z])", repl, diap, flags=re.I )
+        def repl( m ): # d-h -> defgh
+            res = ""
+            for i in range( ord( m.group(1) ), ord( m.group(2) )+1 ):
+                res+= chr( i )
+            return res
+        char = char.replace( ".", "[a-z]" )
+        char = convDiap( char )
+        if re.fullmatch( "[a-z]", char, re.I ):
+            result = set( [char] )
+        elif re.fullmatch( r"\[[a-z]+\]", char, re.I ):
+            result = set( char.replace( "[", "" ).replace( "]", "" ) )
+        elif re.fullmatch( r"\[\^[a-z]+\]", char, re.I ):
+            result = set( char.replace( "[", "" ).replace( "]", "" ).replace( "^", "" ) )
+            result = self.fullABC - result
+        return result
+
+    def unionDiaps( self ):
+        # перебираем все варианты и делаем сеты конкретных символов в конкретных позициях
+        result = [None]*len(self.allRegexs)
+        for i in range( len(self.allRegexs) ): # перебор наборов вариантов
+            sets = [ set() ] * self.allRegexs[i].length
+            for j in self.allRegexs[i].variants: # конкретные варианты
+                chars = reCharsC.findall( j )
+                for k in range( len(chars) ):
+                    s2 = self.char2set( chars[k] )
+                    if len(sets) != len(chars):
+                        print( j, chars )
+                    sets[k] = sets[k].union( s2 )
+            result[i] = sets
+        return result
+
+    def intersectMapping( self, union ):
+        for i in self.cross.maps:
+            res = None
+            text = ""
+            for j in self.cross.maps[i]: # пересечения в соответствии с картой
+                iRe  = self.cross.maps[i][j][0]
+                iPos = self.cross.maps[i][j][1]
+                text+= str( union[iRe][iPos] )+"\n"
+                if res == None:
+                    res = union[iRe][iPos].copy()
+                else:
+                    res = res & union[iRe][iPos]
+            for j in self.cross.maps[i]: # записываем результат пересечений обратно 
+                iRe  = self.cross.maps[i][j][0]
+                iPos = self.cross.maps[i][j][1]
+                if len( res ) ==0: print( union[iRe][iPos] )
+                union[iRe][iPos] = res.copy()
+            text+="inter: "+str(res)+"\n"
+            #print( text )
+            if len( res ) == 0:
+                for j in self.cross.maps[i]:  
+                    iRe  = self.cross.maps[i][j][0]
+                    iPos = self.cross.maps[i][j][1]
+                    print( "null set", iRe, iPos )
+                print()
+        return union
+                
+    def filterDiaps( self, intersect ):
+        changed = False
+        for i in range( len(self.allRegexs) ):
+            toDel = []
+            for k in range( len( self.allRegexs[i].variants ) ):
+                ch = reCharsC.findall( self.allRegexs[i].variants[k] )
+                mark = False
+                for j in range( len( ch ) ):
+                    ls = "".join( list( intersect[i][j] ) )
+                    if not re.search( ch[j], ls, re.I ): mark = True
+                if mark: toDel.append( k )
+            if len( toDel ) > 0:
+                changed = True
+                toDel.reverse()
+                for k in toDel: del self.allRegexs[i].variants[k]
+        return changed
+
+    def checkReBack( self, intersect ):
+        for i in self.reBack:
+            print( "Backtracing Algoritm for:", self.cross.regexs[i] )
+            text = ""
+            counter = 0
+            sets = []
+            maxs = []
+            for j in intersect[i]:
+                if len( j ) == 1:
+                    text+= list( j )[0]
+                else:
+                    text+= "("+str(counter)+ ")"
+                    sets.append( list( j ) )
+                    maxs.append( len( j ) )
+                    counter+= 1
+
+            iters = 1
+            for j in maxs: iters*= j
+            maxs.append( 0 )
+            length = len( sets )
+            counter = [0]*(length+2)
+            label = 0
+            iterCounter = 1
+            result = []
+            while counter[length] == 0:
+                text2 = text
+                for j in range( length ):
+                    text2= text2.replace( "("+str(j)+")", sets[j][ counter[j] ], 1 )
+                if re.fullmatch( self.cross.regexs[i], text2, re.I ):
+                    result.append( text2 )
+                
+                counter[label]+= 1
+                while counter[label] == maxs[label]:
+                    label+=1
+                    counter[label]+= 1
+                while label>0:
+                    label-=1
+                    counter[label] = 0
+                if iterCounter % 5000000 == 0:
+                    print( "Work. Iteration:", iterCounter )
+                iterCounter+=1
+            self.allRegexs[i].variants = result
