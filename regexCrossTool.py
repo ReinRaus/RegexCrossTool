@@ -1,4 +1,4 @@
-import re
+import re, time, os, pickle, hashlib
 
 reChars = r"\[\^?[a-z]+\]|[a-z]|\."
 reCharsC = re.compile( reChars, re.I )
@@ -73,25 +73,46 @@ class singleRegex:
                 for i in result1:
                     for j in parts:
                         result.append( i + j )
-        # несколько символов подряд (в строке нет скобок)
-        result2 = []
-        if not re.search( r"[()]", self.regex ):
-            grp = re.findall( r"(?<![\[])[a-z]{2,}(?![\]*+?{])", self.regex, re.I )
-            if len( grp ) >0 :
-                counter = 1
-                while "["+"a"*counter+"]" in self.units:
-                    counter+= 1
-                opt = grp[0]
-                repl = "["+"a"*counter+"]"
-                regex = re.sub( r"(?<![\[])[a-z]{2,}(?![\]*+?{])", repl, self.regex, 1, re.I )
-                variants = singleRegex( regex, self.length-len(opt)+1 ).variants
-                result = [ i.replace( repl, opt ) for i in variants ]
+        # несколько символов подряд (вне символьного класса)
+        regex1 = r"\[(?:\.|[^]])*\]|([^[]*?)([a-z]{2,})(?!\s*[?*+{])" # что-то внутри [] или [a-z]{2,} если справа не квантификатор
+        grp = re.findall( regex1, self.regex, flags=re.I )
+        grp = list( filter( lambda x: re.search( r"^\w+$", x[1] ), grp ) ) 
+        if len( grp ) > 0:
+            counter = 1
+            while "["+"a"*counter+"]" in self.units:
+                counter+= 1
+            opt = grp[0][1]
+            replText = "["+"a"*counter+"]"
+            counter = 0
+            def repl( m ):
+                nonlocal counter
+                if counter == 0 and m.group(2):
+                    counter += 1
+                    return m.group(1) + replText
+                else:
+                    return m.group()
+            regex = re.sub( regex1, repl, self.regex, flags=re.I )
+            variants = singleRegex( regex, self.length-len(opt)+1 ).variants
+            result = [ i.replace( replText, opt ) for i in variants ]
         if len( result ) > 0: return result
         return None
 
 class Tool:
-
-    pass
-
-x = singleRegex( r"[^C]*[^R]*III.*", 13 ).variants
-print( x )
+    def __init__( self, cross ):
+        tStart = time.time()
+        self.cross = cross
+        hash1 = hashlib.md5( "\n".join( cross.regexs + list( map( str, cross.allLen ) ) ).encode() ).hexdigest()
+        fname = "cross-"+hash1+".cache"
+        if os.path.isfile( fname ):
+            with open( fname, "rb" ) as rfile:
+                self.allRegexs = pickle.load( rfile )
+                print( "Cache from:", fname, "loaded." )
+        else:
+            self.allRegexs = []
+            for i in range( len( cross.regexs ) ):
+                t1 = time.time()
+                self.allRegexs.append( singleRegex( cross.regexs[i], cross.allLen[i] ) )
+                print( cross.regexs[i], ":", time.time()-t1, "sec" )
+            with open( fname, "wb" ) as rfile:
+                pickle.dump( self.allRegexs, rfile )
+            print( "Total time:", time.time()-tStart, "sec" )
