@@ -96,8 +96,8 @@ class singleRegex:
             opt1 = opt1[0]
             parts = opt1.split( "|" )
             if len( parts ) > 0: return recur( parts, "", self.length )
-        # несколько символов подряд (вне символьного класса) где нет скобок до вхождения
-        regex1 = r"^((?:\[(?:\.|[^]])*\]|[^([])*?)([a-z]{2,})(?!\s*[?*+{])" # что-то внутри [] или [a-z]{2,} если справа не квантификатор 
+        # несколько символов подряд (вне символьного класса) где нет скобок до вхождения и нет альтернативы
+        regex1 = r"^((?:\[(?:\.|[^]])*\]|[^([])*?)([a-z]{2,})(?!\s*[?*+{])(?![^(]*\|)" # что-то внутри [] или [a-z]{2,} если справа не квантификатор 
         grp = re.findall( regex1, self.regex, flags=re.I )
         if len( grp ) > 0:
             counter = 1
@@ -154,7 +154,7 @@ class Tool:
             for i in range( len( cross.regexs ) ):
                 t1 = time.time()
                 self.allRegexs.append( singleRegex( cross.regexs[i], cross.allLen[i] ) )
-                print( cross.regexs[i], ":", time.time()-t1, "sec" )
+                print( cross.regexs[i], ":", time.time()-t1, "sec", self.allRegexs[i].variants )
             with open( fname, "wb" ) as rfile:
                 pickle.dump( self.allRegexs, rfile )
             print( "Total time:", time.time()-tStart, "sec" )
