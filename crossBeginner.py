@@ -2,7 +2,7 @@
 import rectMap as rect
 
 class simpleCross():
-    def __init__( values ):
+    def __init__( self, values ):
         self.maps = values[ "maps" ]
         self.regexs = values[ "regexs" ]
         self.printer = values[ "printer" ]
