@@ -28,3 +28,6 @@ def getPrinter( width, height ):
             text += "\n"
         print( text )
     return printer
+
+def getLens( width, height ):
+    return [ width ] * height + [height] * width
