@@ -1,23 +1,53 @@
 # https://regexcrossword.com/challenges/beginner/puzzles/
 import rectMap as rect
-
-class simpleCross():
-    def __init__( self, values ):
-        self.maps = values[ "maps" ]
-        self.regexs = values[ "regexs" ]
-        self.printer = values[ "printer" ]
-        self.allLen = values[ "allLen" ]
+from crossObject import crossObject
 
 cross = []
 
-cross.append( simpleCross( {
-    "maps":    rect.getMap( 2, 2 ),
-    "allLen":  rect.getLens( 2, 2 ),
-    "printer": rect.getPrinter( 2, 2 ),
-    "regexs": [
+# Beatles 0
+cross.append( crossObject(
+    rect.getMap( 2, 2 ),
+    rect.getLens( 2, 2 ),
+    rect.getPrinter( 2, 2 ),
+    [
         r"HE|LL|O+",
         r"[PLEASE]+",
         r"[^SPEAK]+",
         r"EP|IP|EF"
-        ]
-    } ) )
+    ] ) )
+
+# Naughty 1
+cross.append( crossObject(
+    rect.getMap( 2, 2 ),
+    rect.getLens( 2, 2 ),
+    rect.getPrinter( 2, 2 ),
+    [
+        r".*M?O.*",
+        r"(AN|FE|BE)",
+        r"(A|B|C)\1",
+        r"(AB|OE|SK)"
+    ] ) )
+
+# Ghost 2
+cross.append( crossObject(
+    rect.getMap( 2, 2 ),
+    rect.getLens( 2, 2 ),
+    rect.getPrinter( 2, 2 ),
+    [
+        r"(.)+\1",
+        r"[^ABRC]+",
+        r"[COBRA]+",
+        r"(AB|O|OR)+"
+    ] ) )
+
+# Symbolism 3
+cross.append( crossObject(
+    rect.getMap( 2, 2 ),
+    rect.getLens( 2, 2 ),
+    rect.getPrinter( 2, 2 ),
+    [
+        r"[*]+",
+        r"/+",
+        r".?.+",
+        r".+"
+    ] ) )

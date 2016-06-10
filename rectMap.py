@@ -1,15 +1,18 @@
 # прямоугольний кроссворд с нумерацией регулярных выражений от 0 сверху-вниз,
 # потом слева-направо
-#
+#    3  4  5  6      dimensions
+# 0  .  .  .  .      0  →
+# 1  .  .  .  .      1  ↓
+# 2  .  .  .  .
 
-def getMap( width, height ):
+def getMap( width, height, invers = [False, False] ):
     result = {}
     for x in range( width ):
         for y in range( height ):
             index = y * width + x
             result[ index ] = {
-                1: [ y, x ],
-                2: [ height + x, y ]
+                0: [ y, x if not invers[0] else width - x - 1 ],
+                1: [ height + x, y if not invers[1] else height - y - 1 ]
                 }
     return result
 
@@ -31,3 +34,4 @@ def getPrinter( width, height ):
 
 def getLens( width, height ):
     return [ width ] * height + [height] * width
+
