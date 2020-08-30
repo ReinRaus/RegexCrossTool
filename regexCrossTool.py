@@ -119,6 +119,11 @@ class singleRegex:
 
 class Tool:
     def __init__( self, cross ):
+        self.reUtils = [
+            re.compile( "[a-z]", re.I ),       #0
+            re.compile( r"\[[a-z]+\]", re.I ), #1
+            re.compile( r"\[\^[a-z]+\]", re.I )#2
+        ]
         tStart = time.time()
         self.cross = cross
         self.reBack = [ i for i in range( len(cross.regexs) ) if re.search("\\\\\\d", cross.regexs[i] ) ]
@@ -182,11 +187,11 @@ class Tool:
             return res
         char = char.replace( ".", "[a-z]" )
         char = convDiap( char )
-        if re.fullmatch( "[a-z]", char, re.I ):
+        if self.reUtils[0].fullmatch( char ): # [a-z]
             result = set( [char] )
-        elif re.fullmatch( r"\[[a-z]+\]", char, re.I ):
+        elif self.reUtils[1].fullmatch( char ): # \[[a-z]+\]
             result = set( char.replace( "[", "" ).replace( "]", "" ) )
-        elif re.fullmatch( r"\[\^[a-z]+\]", char, re.I ):
+        elif self.reUtils[2].fullmatch( char ): # \[\^[a-z]+\]
             result = set( char.replace( "[", "" ).replace( "]", "" ).replace( "^", "" ) )
             result = self.fullABC - result
         return result
@@ -252,6 +257,7 @@ class Tool:
 
     def checkReBack( self, intersect ):
         for i in self.reBack:
+            reC = re.compile( self.cross.regexs[i], re.I )
             textArr = [None]*len(intersect[i])
             counter = 0
             sets = []
@@ -279,7 +285,7 @@ class Tool:
                 for j in range( length ):
                     textArr[cntmap[j]] = sets[j][ counter[j] ]
                 textStr = "".join( textArr )
-                if re.fullmatch( self.cross.regexs[i], textStr, re.I ):
+                if reC.fullmatch( textStr ):
                     result.append( textStr )
                 
                 counter[label]+= 1
