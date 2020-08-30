@@ -1,3 +1,4 @@
+﻿# -*- coding: utf-8 -*-
 import re, time, os, pickle, hashlib
 
 reChars = r"\[\^?[a-z]+\]|[a-z]|\."
@@ -18,29 +19,31 @@ class singleRegex:
         
     def __processEntitys( self ):
         def repl( m ):
-            return "(?:"+re.escape( m.group(0) )+")"
+            return self.unitsShort[ self.units.index( m.group(0) ) ]
         res = reCharsC.findall( self.regex ) # все симв.классы
-        self.regex2 = reCharsC.sub( repl, self.regex ) # "атомизация" симв.классов
-        self.regex2 = re.compile( "^" + self.regex2 + "$", re.I )
         self.units = list( set( res ) ) # только уникальные симв.классы
+        self.unitsShort = list((chr(i) for i in range(ord('A'),ord('A')+len(self.units))))
+        self.regex2 = reCharsC.sub( repl, self.regex ) # "атомизация" симв.классов
+        self.regex2 = re.compile( b"^" + bytes(self.regex2, "utf-8") + b".$" )
         self.variants = self.__getVariants() # генерация вариантов
 
     def __getVariants( self ):
+        BEGIN = ord( 'A' )
         optim = self.__optimization() # пробуем применить оптимизации
         if optim: return optim
         result = []
-        maxv = len( self.units )
-        if maxv == 1: # если всего один символьный класс
+        maxv = len( self.units )+ BEGIN
+        if len( self.units )==1: # если всего один символьный класс 
             result.append( self.units[0]*self.length )
         else:
-            counter = [0]*(self.length+1)   # алогритм полного перебора массива
+            counter = [BEGIN]*(self.length+1)   # алогритм полного перебора массива
             label = 0                       # длиной length от 0 до maxv
             iterCounter = 1
-            while counter[self.length] == 0:
-                text = ""
-                for i in range( self.length ): # соединяем симв.классы в одну строку на основе массива в котором идет полный перебор
-                    text+= self.units[ counter[i] ]
-                if self.regex2.match( text ): # проверям, что полученная строка соответствует "атомизированному" регулярному выражению, таким образом достигается поддержка регулярных варажений любой сложности
+            while counter[self.length] == BEGIN:
+                if self.regex2.match( bytes(counter) ): # проверям, что полученная строка соответствует "атомизированному" регулярному выражению, таким образом достигается поддержка регулярных варажений любой сложности
+                    text = ""
+                    for i in range( self.length ):
+                        text+= self.units[ counter[i]-BEGIN ]
                     result.append( text )
 
                 counter[label]+= 1 # перебор +1, если достигли maxv, то увеличиваем элемент справа
@@ -49,8 +52,8 @@ class singleRegex:
                     counter[label]+= 1
                 while label>0:
                     label-=1
-                    counter[label] = 0
-                if iterCounter % 10000000 == 0:
+                    counter[label] = BEGIN
+                if not iterCounter % 10000000:
                     print( "I work. Iteration:", iterCounter )
                 iterCounter+=1
         return result
@@ -289,3 +292,10 @@ class Tool:
                     print( "Work. Iteration:", iterCounter )
                 iterCounter+=1
             self.allRegexs[i].variants = result
+
+if __name__ == "__main__":
+    t1 = time.time()
+    test = singleRegex( "F.*[AO].*[AO].*", 13 )
+    t2 = time.time()
+    print( t2 - t1 )
+    print( test.variants )
