@@ -252,22 +252,23 @@ class Tool:
 
     def checkReBack( self, intersect ):
         for i in self.reBack:
-            print( "Backtracing Algoritm for:", self.cross.regexs[i] )
-            text = ""
+            textArr = [None]*len(intersect[i])
             counter = 0
             sets = []
             maxs = []
+            cntmap=[]
             for j in intersect[i]:
                 if len( j ) == 1:
-                    text+= list( j )[0]
+                    textArr[counter]=list( j )[0]
                 else:
-                    text+= "("+str(counter)+ ")"
+                    cntmap.append( counter )
                     sets.append( list( j ) )
                     maxs.append( len( j ) )
-                    counter+= 1
-
+                counter+= 1
+            
             iters = 1
             for j in maxs: iters*= j
+            print( "Backtracing Algoritm for:", self.cross.regexs[i], "Total iters:", iters )
             maxs.append( 0 )
             length = len( sets )
             counter = [0]*(length+2)
@@ -275,11 +276,11 @@ class Tool:
             iterCounter = 1
             result = []
             while counter[length] == 0:
-                text2 = text
                 for j in range( length ):
-                    text2= text2.replace( "("+str(j)+")", sets[j][ counter[j] ], 1 )
-                if re.fullmatch( self.cross.regexs[i], text2, re.I ):
-                    result.append( text2 )
+                    textArr[cntmap[j]] = sets[j][ counter[j] ]
+                textStr = "".join( textArr )
+                if re.fullmatch( self.cross.regexs[i], textStr, re.I ):
+                    result.append( textStr )
                 
                 counter[label]+= 1
                 while counter[label] == maxs[label]:
@@ -289,7 +290,7 @@ class Tool:
                     label-=1
                     counter[label] = 0
                 if iterCounter % 5000000 == 0:
-                    print( "Work. Iteration:", iterCounter )
+                    print( "Work. Iteration:", iterCounter, "Progress:", int( iterCounter/iters*100 ), "%" )
                 iterCounter+=1
             self.allRegexs[i].variants = result
 
