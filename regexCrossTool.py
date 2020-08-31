@@ -255,8 +255,29 @@ class Tool:
                 for k in toDel: del self.allRegexs[i].variants[k]
         return changed
 
+    def optimReBack( self, regex, intersect ):
+        if regex == r"(...?)\1*": # да и пофиг, что конкретное оптимизируем
+            length = len( intersect )
+            result = []
+            for i in intersect[0]:
+                for j in intersect[1]:
+                    result.append( (i+j)*int(length/2) )
+                    for k in intersect[2]:
+                        result.append( (i+j+k)*int(length/3) )
+            for i in range( len(result)-1, -1, -1 ):
+                needDelete = False
+                for j in range( length ):
+                    if not result[i][j] in intersect[j]: needDelete = True
+                if needDelete: del result[i]
+            print( "Optimization for:", regex, "Variants:", len( result ) )
+            return result
+
     def checkReBack( self, intersect ):
         for i in self.reBack:
+            optim = self.optimReBack( self.cross.regexs[i], intersect[i] )
+            if optim:
+                self.allRegexs[i].variants = optim
+                continue
             reC = re.compile( self.cross.regexs[i], re.I )
             textArr = [None]*len(intersect[i])
             counter = 0
