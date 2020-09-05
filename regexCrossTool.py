@@ -12,9 +12,11 @@ reCharsC = re.compile( reChars, re.I )
 # units     уникальные "атомные" символьные классы      [ab] , c , d
 # variants  все возможные варианты                      [ab]ccc , [ab]ccd
 class singleRegex:
-    def __init__( self, regex, length ):
+    def __init__( self, regex, length, debug=False ):
         self.regex = regex   
-        self.length = length 
+        self.length = length
+        self.debug = debug
+        if self.debug: print( "DEBUG: Regex:", regex, "Length:", length )
         self.__processEntitys()
         
     def __processEntitys( self ):
@@ -22,24 +24,32 @@ class singleRegex:
             return self.unitsShort[ self.units.index( m.group(0) ) ]
         res = reCharsC.findall( self.regex ) # все симв.классы
         self.units = list( set( res ) ) # только уникальные симв.классы
+        if self.debug: print( "DEBUG: All symbols:", self.units )
         self.unitsShort = list((chr(i) for i in range(ord('A'),ord('A')+len(self.units))))
         self.regex2 = reCharsC.sub( repl, self.regex ) # "атомизация" симв.классов
-        self.regex2 = re.compile( b"^" + bytes(self.regex2, "utf-8") + b".$" )
+        if self.debug:
+            print( "DEBUG: Atomic regex:", self.regex2 )
+            print( "DEBUG: Equivalents for symbols:" )
+            for i in range( len( self.units ) ): print( "DEBUG:", self.unitsShort[i], "=", self.units[i] )
+        self.regex2 = re.compile( b"^" + bytes(self.regex2, "utf-8") + b"$" )
         self.variants = self.__getVariants() # генерация вариантов
 
     def __getVariants( self ):
         BEGIN = ord( 'A' )
         optim = self.__optimization() # пробуем применить оптимизации
         if optim: return optim
+        if self.debug: print( "DEBUG: No optimization" )
         result = []
         maxv = len( self.units )+ BEGIN
-        if len( self.units )==1: # если всего один символьный класс 
-            result.append( self.units[0]*self.length )
+        if len( self.units )==1: # если всего один символьный класс
+            if self.regex2.match( bytes(self.unitsShort[0], "utf-8") * self.length ):
+                result.append( self.units[0] * self.length )
         else:
-            counter = [BEGIN]*(self.length+1)   # алогритм полного перебора массива
+            counter = [BEGIN] * self.length # алгоритм полного перебора массива
             label = 0                       # длиной length от 0 до maxv
             iterCounter = 1
-            while counter[self.length] == BEGIN:
+            loop = True
+            while loop:
                 if self.regex2.match( bytes(counter) ): # проверям, что полученная строка соответствует "атомизированному" регулярному выражению, таким образом достигается поддержка регулярных варажений любой сложности
                     text = ""
                     for i in range( self.length ):
@@ -49,13 +59,18 @@ class singleRegex:
                 counter[label]+= 1 # перебор +1, если достигли maxv, то увеличиваем элемент справа
                 while counter[label] == maxv:
                     label+=1
-                    counter[label]+= 1
+                    if label == self.length: # перебор окончен
+                        loop = False
+                        break
+                    else:
+                        counter[label]+= 1
                 while label>0:
                     label-=1
                     counter[label] = BEGIN
                 if not iterCounter % 10000000:
                     print( "I work. Iteration:", iterCounter )
                 iterCounter+=1
+        if self.debug and len( result ) == 0: print( "DEBUG: No variants for regex:", self.regex, "Length:", self.length )
         return result
     
     def __optimization( self ):
@@ -77,6 +92,7 @@ class singleRegex:
                     for j in parts:
                         result.append( i + j )
                 return result
+                if self.debug: print( "DEBUG: Used optimization: Alternative in end of string .*(A|B|C)" )
             
         # оптимизация альтернативы с квантификатором и в регулярке больше ничего
         # использует переменные предыдущей оптимизация, ничего между ними в
@@ -116,6 +132,7 @@ class singleRegex:
             result = [ i.replace( replText, opt ) for i in variants ]
         if len( result ) > 0: return result
         return None
+
 
 class Tool:
     def __init__( self, cross ):
@@ -323,7 +340,7 @@ class Tool:
 
 if __name__ == "__main__":
     t1 = time.time()
-    test = singleRegex( "F.*[AO].*[AO].*", 13 )
+    test = singleRegex( "C*MC(CCC|MM)*", 5, True )
     t2 = time.time()
     print( t2 - t1 )
     print( test.variants )
