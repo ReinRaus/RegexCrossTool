@@ -71,7 +71,7 @@ class singleRegex:
                     print( "I work. Iteration:", iterCounter )
                 iterCounter+=1
         if self.debug and len( result ) == 0: print( "DEBUG: No variants for regex:", self.regex, "Length:", self.length )
-        return result
+        return result # может быть пустой
     
     def __optimization( self ):
         result = []
