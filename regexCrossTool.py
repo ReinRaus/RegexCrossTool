@@ -16,6 +16,7 @@ class singleRegex:
         self.regex = regex   
         self.length = length
         self.debug = debug
+        self.variants = []
         if self.debug: print( "DEBUG: Regex:", regex, "Length:", length )
         self.__processEntitys()
         
@@ -272,47 +273,25 @@ class Tool:
                 for k in toDel: del self.allRegexs[i].variants[k]
         return changed
 
-    def optimReBack( self, regex, intersect ):
-        if regex == r"(...?)\1*": # да и пофиг, что конкретное оптимизируем
-            length = len( intersect )
-            result = []
-            for i in intersect[0]:
-                for j in intersect[1]:
-                    result.append( (i+j)*int(length/2) )
-                    for k in intersect[2]:
-                        result.append( (i+j+k)*int(length/3) )
-            for i in range( len(result)-1, -1, -1 ):
-                needDelete = False
-                for j in range( length ):
-                    if not result[i][j] in intersect[j]: needDelete = True
-                if needDelete: del result[i]
-            print( "Optimization for:", regex, "Variants:", len( result ) )
-            return result
-
-    def checkReBack( self, intersect ):
-        for i in self.reBack:
-            optim = self.optimReBack( self.cross.regexs[i], intersect[i] )
-            if optim:
-                self.allRegexs[i].variants = optim
-                continue
-            reC = re.compile( self.cross.regexs[i], re.I )
-            textArr = [None]*len(intersect[i])
+    def brutforce( self, regex, intersect ):
+            reC = re.compile( regex, re.I )
+            textArr = [None]*len(intersect)
             counter = 0
             sets = []
             maxs = []
             cntmap=[]
-            for j in intersect[i]:
-                if len( j ) == 1:
-                    textArr[counter]=list( j )[0]
+            for i in intersect:
+                if len( i ) == 1:
+                    textArr[counter]=list( i )[0]
                 else:
                     cntmap.append( counter )
-                    sets.append( list( j ) )
-                    maxs.append( len( j ) )
+                    sets.append( list( i ) )
+                    maxs.append( len( i ) )
                 counter+= 1
             
             iters = 1
-            for j in maxs: iters*= j
-            print( "Backtracing Algoritm for:", self.cross.regexs[i], "Total iters:", iters )
+            for i in maxs: iters*= i
+            print( "Brutforce Algoritm for:", regex, "Length:", len(intersect), "Total iters:", iters )
             maxs.append( 0 )
             length = len( sets )
             counter = [0]*(length+2)
@@ -320,8 +299,8 @@ class Tool:
             iterCounter = 1
             result = []
             while counter[length] == 0:
-                for j in range( length ):
-                    textArr[cntmap[j]] = sets[j][ counter[j] ]
+                for i in range( length ):
+                    textArr[cntmap[i]] = sets[i][ counter[i] ]
                 textStr = "".join( textArr )
                 if reC.fullmatch( textStr ):
                     result.append( textStr )
@@ -336,11 +315,46 @@ class Tool:
                 if iterCounter % 5000000 == 0:
                     print( "Work. Iteration:", iterCounter, "Progress:", int( iterCounter/iters*100 ), "%" )
                 iterCounter+=1
-            self.allRegexs[i].variants = result
+            return result        
+
+    def optimReBack( self, regex, intersect ):
+        result = []
+        length = len( intersect )
+        reC = re.compile( regex, re.I )
+        # регулярка начинается с группы, эта группа единственная и повторяется до конца строки (...?)\1*
+        t1 = time.time()
+        test = re.fullmatch( r"\((?![?])(.*)\)\\1(?:[*+?]|\{\d*,?\d*\})", regex )
+        if test:
+            print( "Optimization for:", regex, r"Type: one group to end (...?)\1*" )
+            for i in range( 1, len( intersect )+1 ):
+                if singleRegex( test.group(1), i ).variants:
+                    brut = self.brutforce( test.group(1), intersect[:i] )
+                    for j in brut: result.append( j * int( length / i ) )
+        else: # если никакие оптимизации не подошли, то полный перебор
+            result = self.brutforce( regex, intersect )
+
+        # общий код для всех оптимизаций - фильтрация полученных вариантов
+        # первое - проверка, что из множества intersect можно составить полученный текст
+        for i in range( len(result)-1, -1, -1 ):
+            needDelete = False
+            for j in range( length ):
+                if not result[i][j] in intersect[j]: needDelete = True
+            if needDelete: del result[i]
+        # второе - проверка, что полученные результаты соответствуют регулярному выражению
+        for i in range( len(result)-1, -1, -1 ):
+            if not reC.fullmatch( result[i] ): del result[i]
+        t2 = time.time()
+        if result: print( "Result for:", regex, "Variants:", len( result ), "Time:", t2-t1 )
+        return result
+
+    def checkReBack( self, intersect ):
+        for i in self.reBack:
+            optim = self.optimReBack( self.cross.regexs[i], intersect[i] )
+            self.allRegexs[i].variants = optim
 
 if __name__ == "__main__":
     t1 = time.time()
-    test = singleRegex( "C*MC(CCC|MM)*", 5, True )
+    test = singleRegex( r"(...?)\1*", 6, True )
     t2 = time.time()
     print( t2 - t1 )
     print( test.variants )
