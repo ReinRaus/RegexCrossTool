@@ -298,20 +298,30 @@ class Tool:
             label = 0
             iterCounter = 1
             result = []
-            while counter[length] == 0:
-                for i in range( length ):
-                    textArr[cntmap[i]] = sets[i][ counter[i] ]
+            for i in range( length ):
+                textArr[cntmap[i]] = sets[i][ counter[i] ]
+            if iters == 1: # чтобы не загромождать полный перебор дополнительными проверками на границы массива
+                result.append( "".join( [ list(i)[0] for i in intersect ] ) )
+                return result
+            while True:
                 textStr = "".join( textArr )
                 if reC.fullmatch( textStr ):
                     result.append( textStr )
                 
                 counter[label]+= 1
+                if not counter[label] == maxs[label]:
+                    textArr[cntmap[label]] = sets[label][counter[label] ]
+                    continue
                 while counter[label] == maxs[label]:
                     label+=1
                     counter[label]+= 1
+                if counter[length] != 0: break # выход из перебора
+                textArr[cntmap[label]] = sets[label][counter[label] ]
                 while label>0:
                     label-=1
                     counter[label] = 0
+                    textArr[cntmap[label]] = sets[label][counter[label] ]
+
                 if iterCounter % 5000000 == 0:
                     print( "Work. Iteration:", iterCounter, "Progress:", int( iterCounter/iters*100 ), "%" )
                 iterCounter+=1
