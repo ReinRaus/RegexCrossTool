@@ -134,20 +134,44 @@ class singleRegex:
             variants = singleRegex( regex, self.length-len(opt)+1 ).variants
             result = [ i.replace( replText, opt ) for i in variants ]
 
-        # оптимизация - атом в конце строки со *, если этого атома больше нет в регулярке
-        test = re.fullmatch( "(.*)("+reChars+")[*]$", self.regex )
-        if test and not (test.group(2) in test.group(1)):
-            for i in range( self.length ):
+        # оптимизация - атом в конце строки с квантификатором, если этого атома больше нет в регулярке
+        test = re.fullmatch( "(.*)("+reChars+r")([*?+]|\{(\d*),?(\d*)\}|)$", self.regex, re.I )
+        if test and ( not (test.group(2) in test.group(1)) or test.group(3) == "" ):
+            if self.debug: print( "DEBUG: Used optimization: atom in the end of regex" )
+            if test.group(3) == "?":
+                rStart, rEnd = 0, 2
+            elif test.group(3) == "*":
+                rStart, rEnd = 0, self.length+1
+            elif test.group(3) == "+":
+                rStart, rEnd = 1, self.length+1
+            elif test.group(3) == "":
+                rStart, rEnd = 1, 2
+            else:
+                rStart = int( test.group(4) ) if test.group(4) else 0
+                rEnd   = int( test.group(5) )+1 if test.group(5) else self.length+1
+            for i in range( rStart, rEnd ):
                 vari = singleRegex( test.group(1), self.length-i )
                 result+=[ j + test.group(2)*i for j in vari.variants ]
-            return result
-        # оптимизация - атом в начале строки со *, если этого атома больше нет в регулярке
-        test = re.fullmatch( "^("+"|".join(map(re.escape, self.units))+")[*](.*)", self.regex )
-        if test and not (test.group(1) in test.group(2)):
-            for i in range( self.length ):
-                vari = singleRegex( test.group(2), self.length-i )
+            return list(set(result))
+        # оптимизация - атом в начале строки с квантификатором, если этого атома больше нет в регулярке
+        test = re.fullmatch( "^("+reChars+r")([*?+]|\{(\d*),?(\d*)\}|)(.*)", self.regex, re.I )
+        if test and ( not (test.group(1) in test.group(5)) or test.group(2) == "" ):
+            if self.debug: print( "DEBUG: Used optimization: atom in the start of regex" )
+            if test.group(2) == "?":
+                rStart, rEnd = 0, 2
+            elif test.group(2) == "*":
+                rStart, rEnd = 0, self.length+1
+            elif test.group(2) == "+":
+                rStart, rEnd = 1, self.length+1
+            elif test.group(2) == "":
+                rStart, rEnd = 1, 2
+            else:
+                rStart = int( test.group(3) ) if test.group(3) else 0
+                rEnd   = int( test.group(4) )+1 if test.group(4) else self.length+1
+            for i in range( rStart, rEnd ):
+                vari = singleRegex( test.group(5), self.length-i )
                 result+=[ test.group(1)*i + j for j in vari.variants ]
-            return result
+            return list(set(result))
         
         if len( result ) > 0: return result
         return None
@@ -382,7 +406,7 @@ class Tool:
 
 if __name__ == "__main__":
     t1 = time.time()
-    test = singleRegex( r"[AM]*CM(RC)*R?", 12, True )
+    test = singleRegex( r"[AM]*CM(RC)*R*", 13, True )
     t2 = time.time()
     print( t2 - t1 )
     print( test.variants )
