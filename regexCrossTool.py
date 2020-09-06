@@ -36,6 +36,8 @@ class singleRegex:
         self.variants = self.__getVariants() # генерация вариантов
 
     def __getVariants( self ):
+        if self.length < 1: return []
+        if self.regex == "": return []
         BEGIN = ord( 'A' )
         optim = self.__optimization() # пробуем применить оптимизации
         if optim: return optim
@@ -131,6 +133,22 @@ class singleRegex:
             #print( "NewRegex", regex, self.regex )
             variants = singleRegex( regex, self.length-len(opt)+1 ).variants
             result = [ i.replace( replText, opt ) for i in variants ]
+
+        # оптимизация - атом в конце строки со *, если этого атома больше нет в регулярке
+        test = re.fullmatch( "(.*)("+reChars+")[*]$", self.regex )
+        if test and not (test.group(2) in test.group(1)):
+            for i in range( self.length ):
+                vari = singleRegex( test.group(1), self.length-i )
+                result+=[ j + test.group(2)*i for j in vari.variants ]
+            return result
+        # оптимизация - атом в начале строки со *, если этого атома больше нет в регулярке
+        test = re.fullmatch( "^("+"|".join(map(re.escape, self.units))+")[*](.*)", self.regex )
+        if test and not (test.group(1) in test.group(2)):
+            for i in range( self.length ):
+                vari = singleRegex( test.group(2), self.length-i )
+                result+=[ test.group(1)*i + j for j in vari.variants ]
+            return result
+        
         if len( result ) > 0: return result
         return None
 
@@ -180,7 +198,7 @@ class Tool:
             for i in range( len( cross.regexs ) ):
                 t1 = time.time()
                 self.allRegexs.append( singleRegex( cross.regexs[i], cross.allLen[i] ) )
-                print( cross.regexs[i], ":", time.time()-t1, "sec" )
+                print( cross.regexs[i], "Length:", cross.allLen[i], "Time:", time.time()-t1, "sec" )
             with open( fname, "wb" ) as rfile:
                 pickle.dump( self.allRegexs, rfile )
             print( "Total time:", time.time()-tStart, "sec" )
@@ -364,7 +382,8 @@ class Tool:
 
 if __name__ == "__main__":
     t1 = time.time()
-    test = singleRegex( r"(...?)\1*", 6, True )
+    test = singleRegex( r"[AM]*CM(RC)*R?", 12, True )
     t2 = time.time()
     print( t2 - t1 )
     print( test.variants )
+    print( "Len:", len(test.variants))
