@@ -189,7 +189,7 @@ class singleRegex:
 
 
 class Tool:
-    def __init__( self, cross ):
+    def __init__( self, cross, useCache = True ):
         self.reUtils = [
             re.compile( "[a-z]", re.I ),       #0
             re.compile( r"\[[a-z]+\]", re.I ), #1
@@ -197,6 +197,7 @@ class Tool:
         ]
         tStart = time.time()
         self.cross = cross
+        self.useCache = useCache
         self.reBack = [ i for i in range( len(cross.regexs) ) if re.search("\\\\\\d", cross.regexs[i] ) ]
         self.loadOrCalcVariants()
         self.fullABC = self.getFullABC()
@@ -223,7 +224,7 @@ class Tool:
         cross = self.cross
         hash1 = hashlib.md5( "\n".join( cross.regexs + list( map( str, cross.allLen ) ) ).encode() ).hexdigest()
         fname = "cross-"+hash1+".cache"
-        if os.path.isfile( fname ):
+        if os.path.isfile( fname ) and self.useCache:
             with open( fname, "rb" ) as rfile:
                 self.allRegexs = pickle.load( rfile )
                 print( "Cache from:", fname, "loaded." )
