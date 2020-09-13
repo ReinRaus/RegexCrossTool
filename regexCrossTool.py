@@ -4,11 +4,11 @@ import re, time, os, pickle, hashlib
 reChars = r"\[\^?[a-z]+\]|[a-z]|\."
 reCharsC = re.compile( reChars, re.I )
 
-# вычисляет на какую длину может распространиться регулярное выражение от 0 до maxLength
-def getRegexLength( regex, maxLength ):
+# вычисляет на какую длину может распространиться регулярное выражение от minLength до maxLength
+def getRegexLength( regex, minLength, maxLength ):
     result = []  
     regex = re.compile( reCharsC.sub( ".", regex ), re.I )
-    return [ i for i in range( maxLength + 1 ) if regex.fullmatch( "a" * i ) ]
+    return [ i for i in range( minLength, maxLength + 1 ) if regex.fullmatch( "a" * i ) ]
 
 # regex     исходное регулярное выражение               [ab]c*d?
 # length    длина на которую оно распространяется       4
@@ -37,12 +37,13 @@ class singleRegex:
             print( "DEBUG: Atomic regex:", self.regex2 )
             print( "DEBUG: Equivalents for symbols:" )
             for i in range( len( self.units ) ): print( "DEBUG:", self.unitsShort[i], "=", self.units[i] )
-        self.regex2 = re.compile( b"^" + bytes(self.regex2, "utf-8") + b"$" )
+        self.regex2 = re.compile( bytes(self.regex2, "utf-8") )
         self.variants = self.__getVariants() # генерация вариантов
 
     def __getVariants( self ):
-        if self.length < 1: return []
+        if self.length < 1: return [] # чтобы не обрабатывать на правильность границ
         if self.regex == "": return []
+        if not self.length in getRegexLength( self.regex, self.length, self.length ): return []
         optim = self.__optimization() # пробуем применить оптимизации
         if optim: return optim
         if self.debug: print( "DEBUG: No optimization" )
@@ -50,7 +51,7 @@ class singleRegex:
         result = []
         maxv = len( self.units ) + BEGIN
         if len( self.units )==1: # если всего один символьный класс
-            if self.regex2.match( bytes( self.unitsShort[0], "utf-8" ) * self.length ):
+            if self.regex2.fullmatch( bytes( self.unitsShort[0], "utf-8" ) * self.length ):
                 result.append( self.units[0] * self.length )
         else:
             counter = [BEGIN] * self.length # алгоритм полного перебора массива
@@ -154,7 +155,7 @@ class singleRegex:
             else:
                 rStart = int( test.group(4) ) if test.group(4) else 0
                 rEnd   = int( test.group(5) )+1 if test.group(5) else self.length+1
-            availableLengths = getRegexLength( test.group(1), self.length )
+            availableLengths = getRegexLength( test.group(1), 0, self.length )
             for i in range( rStart, rEnd ):
                 if self.length-i in availableLengths:
                     vari = singleRegex( test.group(1), self.length-i )
@@ -176,7 +177,7 @@ class singleRegex:
             else:
                 rStart = int( test.group(3) ) if test.group(3) else 0
                 rEnd   = int( test.group(4) )+1 if test.group(4) else self.length+1
-            availableLengths = getRegexLength( test.group(5), self.length )
+            availableLengths = getRegexLength( test.group(5), 0, self.length )
             for i in range( rStart, rEnd ):
                 if self.length-i in availableLengths:
                     vari = singleRegex( test.group(5), self.length-i )
@@ -421,5 +422,5 @@ if __name__ == "__main__":
     print( t2 - t1 )
     print( test.variants )
     print( "Len:", len(test.variants))
-    print( getRegexLength( r"(aaa)\1*", 12 ) )
+    print( getRegexLength( r"(aaa)\1*", 0, 12 ) )
     
