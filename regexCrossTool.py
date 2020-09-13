@@ -4,6 +4,11 @@ import re, time, os, pickle, hashlib
 reChars = r"\[\^?[a-z]+\]|[a-z]|\."
 reCharsC = re.compile( reChars, re.I )
 
+# вычисляет на какую длину может распространиться регулярное выражение от 0 до maxLength
+def getRegexLength( regex, maxLength ):
+    result = []  
+    regex = re.compile( reCharsC.sub( ".", regex ), re.I )
+    return [ i for i in range( maxLength + 1 ) if regex.fullmatch( "a" * i ) ]
 
 # regex     исходное регулярное выражение               [ab]c*d?
 # length    длина на которую оно распространяется       4
@@ -38,14 +43,14 @@ class singleRegex:
     def __getVariants( self ):
         if self.length < 1: return []
         if self.regex == "": return []
-        BEGIN = ord( 'A' )
         optim = self.__optimization() # пробуем применить оптимизации
         if optim: return optim
         if self.debug: print( "DEBUG: No optimization" )
+        BEGIN = ord( 'A' )
         result = []
-        maxv = len( self.units )+ BEGIN
+        maxv = len( self.units ) + BEGIN
         if len( self.units )==1: # если всего один символьный класс
-            if self.regex2.match( bytes(self.unitsShort[0], "utf-8") * self.length ):
+            if self.regex2.match( bytes( self.unitsShort[0], "utf-8" ) * self.length ):
                 result.append( self.units[0] * self.length )
         else:
             counter = [BEGIN] * self.length # алгоритм полного перебора массива
@@ -53,10 +58,10 @@ class singleRegex:
             iterCounter = 1
             loop = True
             while loop:
-                if self.regex2.match( bytes(counter) ): # проверям, что полученная строка соответствует "атомизированному" регулярному выражению, таким образом достигается поддержка регулярных варажений любой сложности
+                if self.regex2.fullmatch( bytes(counter) ): # проверям, что полученная строка соответствует "атомизированному" регулярному выражению, таким образом достигается поддержка регулярных варажений любой сложности
                     text = ""
                     for i in range( self.length ):
-                        text+= self.units[ counter[i]-BEGIN ]
+                        text+= self.units[ counter[i] - BEGIN ]
                     result.append( text )
 
                 counter[label]+= 1 # перебор +1, если достигли maxv, то увеличиваем элемент справа
@@ -78,6 +83,7 @@ class singleRegex:
     
     def __optimization( self ):
         result = []
+
         # оптимизация - альтернатива в конце строки одной длины
         result1 = []
         reCh = r"(?:"+reChars+")+"
@@ -94,13 +100,11 @@ class singleRegex:
                 for i in result1:
                     for j in parts:
                         result.append( i + j )
-                return result
                 if self.debug: print( "DEBUG: Used optimization: Alternative in end of string .*(A|B|C)" )
+                return result
             
         # оптимизация альтернативы с квантификатором и в регулярке больше ничего
-        # использует переменные предыдущей оптимизация, ничего между ними в
-        # коде не размещать
-
+        reCh = r"(?:"+reChars+")+"
         def recur( arr, string, length ):
             res = []
             for i in arr:
@@ -118,6 +122,7 @@ class singleRegex:
             opt1 = opt1[0]
             parts = opt1.split( "|" )
             if len( parts ) > 0: return recur( parts, "", self.length )
+            
         # несколько символов подряд (вне символьного класса) где нет скобок до вхождения и нет альтернативы
         regex1 = r"^((?:\[(?:\.|[^]])*\]|[^|([])*?)([a-z]{2,})(?!\s*[?*+{])(?![^(]*\|)" # что-то внутри [] или [a-z]{2,} если справа не квантификатор 
         grp = re.findall( regex1, self.regex, flags=re.I )
@@ -149,10 +154,13 @@ class singleRegex:
             else:
                 rStart = int( test.group(4) ) if test.group(4) else 0
                 rEnd   = int( test.group(5) )+1 if test.group(5) else self.length+1
+            availableLengths = getRegexLength( test.group(1), self.length )
             for i in range( rStart, rEnd ):
-                vari = singleRegex( test.group(1), self.length-i )
-                result+=[ j + test.group(2)*i for j in vari.variants ]
+                if self.length-i in availableLengths:
+                    vari = singleRegex( test.group(1), self.length-i )
+                    result+=[ j + test.group(2)*i for j in vari.variants ]
             return list(set(result))
+        
         # оптимизация - атом в начале строки с квантификатором, если этого атома больше нет в регулярке
         test = re.fullmatch( "^("+reChars+r")([*?+]|\{(\d*),?(\d*)\}|)(.*)", self.regex, re.I )
         if test and ( not (test.group(1) in test.group(5)) or test.group(2) == "" ):
@@ -168,9 +176,11 @@ class singleRegex:
             else:
                 rStart = int( test.group(3) ) if test.group(3) else 0
                 rEnd   = int( test.group(4) )+1 if test.group(4) else self.length+1
+            availableLengths = getRegexLength( test.group(5), self.length )
             for i in range( rStart, rEnd ):
-                vari = singleRegex( test.group(5), self.length-i )
-                result+=[ test.group(1)*i + j for j in vari.variants ]
+                if self.length-i in availableLengths:
+                    vari = singleRegex( test.group(5), self.length-i )
+                    result+=[ test.group(1)*i + j for j in vari.variants ]
             return list(set(result))
         
         if len( result ) > 0: return result
@@ -406,8 +416,10 @@ class Tool:
 
 if __name__ == "__main__":
     t1 = time.time()
-    test = singleRegex( r"[AM]*CM(RC)*R*", 13, True )
+    test = singleRegex( r".*(IN|SE|HIPS)", 8, True )
     t2 = time.time()
     print( t2 - t1 )
     print( test.variants )
     print( "Len:", len(test.variants))
+    print( getRegexLength( r"(aaa)\1*", 12 ) )
+    
